@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--finetune_epochs', type=int, default=15,
                         help='the number of finetune epochs after pruning')
     parser.add_argument('--lr', type=float, default=0.001, help='the learning rate of model')
-    parser.add_argument('--lr_decay', choices=['multistep', 'cos'], default='multistep', help='lr decay scheduler type')
+    parser.add_argument('--lr_decay', choices=['multistep', 'cos', 'step'], default='multistep', help='lr decay scheduler type')
     parser.add_argument('--type', choices=['l1', 'l2', 'activation'], default='l1', help='the pruning algo type')
     parser.add_argument('--para', action='store_true', help='if use multiple gpus')
     return parser.parse_args()
@@ -146,9 +146,11 @@ if __name__ == '__main__':
     scheduler1 = None
     if args.lr_decay == 'multistep':
         scheduler1 = MultiStepLR(
-            optimizer1, milestones=[int(args.finetune_epochs*0.5), int(args.finetune_epochs*0.75)], gamma=0.1)
+            optimizer1, milestones=[int(args.finetune_epochs*0.25), int(args.finetune_epochs*0.5), int(args.finetune_epochs*0.75)], gamma=0.1)
     elif args.lr_decay == 'cos':
         scheduler1 = CosineAnnealingLR(optimizer1, T_max=args.finetune_epochs)
+    elif args.lr_decay == 'step':
+        scheduler1 = StepLR(optimizer1, step_size=5, gamma=0.1)
     criterion1 = torch.nn.CrossEntropyLoss()
 
     acc1 = test(net1, device, criterion1, val_loader)
