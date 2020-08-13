@@ -67,7 +67,11 @@ def get_model(n_class):
         checkpoint_path = './checkpoints/torch/mobilenetv2_imagenet_0.7amc_70.854.pth.tar'
     else:
         raise NotImplementedError
-
+    for name, module in net.named_modules():
+        if isinstance(module, nn.Conv2d):
+            print(name, module.out_channels)
+    import sys
+    sys.exit(-1)
     print('=> Loading checkpoints..')
     checkpoint = torch.load(checkpoint_path)
     if 'state_dict' in checkpoint:
