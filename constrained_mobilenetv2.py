@@ -126,8 +126,15 @@ if __name__ == '__main__':
 
     with open(args.sparsity, 'r') as jf:
         cfglist = json.load(jf)
-    # pruner1 = Constrained_L1FilterPruner(net1, cfglist, dummy_input.to(device))
-    pruner1 = ConstrainedActivationMeanRankFilterPruner(net1, cfglist, dummy_input.to(device))
+    if args.type == 'l1':
+        pruner1 = Constrained_L1FilterPruner(net1, cfglist, dummy_input.to(device))
+    elif args.type == 'activation':
+        pruner1 = ConstrainedActivationMeanRankFilterPruner(net1, cfglist, dummy_input.to(device))
+        for data, label in train_loader:
+            data = data.to(device)
+            net1(data)
+            break
+
 
     pruner1.compress()
     mask_path = './mask_%f_%d_%s' % (args.lr, args.finetune_epochs, args.lr_decay)
@@ -161,7 +168,7 @@ if __name__ == '__main__':
         # Scale the batch size, rebuild the data loader
         args.batch_size = args.batch_size * cuda.device_count()
         train_loader, val_loader, dummy_input = get_data(args)
-    
+
 
   
     for epoch in range(args.finetune_epochs):
