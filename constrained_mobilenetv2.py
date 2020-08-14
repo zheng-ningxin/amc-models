@@ -17,6 +17,23 @@ from nni.compression.torch import ModelSpeedup
 from nni.compression.torch.utils.counter import count_flops_params 
 from utils import measure_model, AverageMeter, progress_bar, accuracy, process_state_dict
 
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, classes, smoothing=0.0, dim=-1):
+        super(LabelSmoothingLoss, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.cls = classes
+        self.dim = dim
+
+    def forward(self, pred, target):
+        pred = pred.log_softmax(dim=self.dim)
+        with torch.no_grad():
+            # true_dist = pred.data.clone()
+            true_dist = torch.zeros_like(pred)
+            true_dist.fill_(self.smoothing / (self.cls - 1))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+        return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
+
 def imagenet_dataset(args):
     kwargs = {'num_workers': 10, 'pin_memory': True} if torch.cuda.is_available() else {}
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -59,6 +76,8 @@ def parse_args():
                         help='the number of finetune epochs after pruning')
     parser.add_argument('--lr', type=float, default=0.001, help='the learning rate of model')
     parser.add_argument('--lr_decay', choices=['multistep', 'cos', 'step'], default='multistep', help='lr decay scheduler type')
+    parser.add_argument('--label-smothing', type=float, default=None, help='label smothing')
+    parser.add_argument('--weight-decay', type=float, default=5e-4, help='weight decay')
     parser.add_argument('--type', choices=['l1', 'l2', 'activation'], default='l1', help='the pruning algo type')
     parser.add_argument('--para', action='store_true', help='if use multiple gpus')
     return parser.parse_args()
@@ -149,7 +168,7 @@ if __name__ == '__main__':
     
     optimizer1 = torch.optim.SGD(net1.parameters(), lr=args.lr,
                                 momentum=0.9,
-                                weight_decay=5e-4)
+                                weight_decay=args.weight_decay)
     scheduler1 = None
     if args.lr_decay == 'multistep':
         scheduler1 = MultiStepLR(
@@ -157,8 +176,11 @@ if __name__ == '__main__':
     elif args.lr_decay == 'cos':
         scheduler1 = CosineAnnealingLR(optimizer1, T_max=args.finetune_epochs)
     elif args.lr_decay == 'step':
-        scheduler1 = StepLR(optimizer1, step_size=5, gamma=0.1)
+        scheduler1 = StepLR(optimizer1, step_size=10, gamma=0.1)
+    
     criterion1 = torch.nn.CrossEntropyLoss()
+    if args.label_smothing:
+        criterion1 = LabelSmoothingLoss(1000, args.label_smothing)
 
     acc1 = test(net1, device, criterion1, val_loader)
     print('After pruning:  %f' % (acc1))
