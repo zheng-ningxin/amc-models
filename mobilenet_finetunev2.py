@@ -67,12 +67,12 @@ def parse_args():
                         help='dataset directory')
     parser.add_argument('--batch-size', type=int, default=64,
                         help='input batch size for training (default: 64)')
-    parser.add_argument('--checkpoint', type=str, default =None, help='The path of the checkpoint to load')
+    parser.add_argument('--checkpoint', type=str, default ='.checkpoints/torch/mobilenetv2_imagenet_71.814.pth.tar', help='The path of the checkpoint to load')
     parser.add_argument('--sparsity', type=str, default='mobilenetv2_config.json',
                         help='path of the sparsity config file')
     parser.add_argument('--log-interval', type=int, default=200,
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--finetune_epochs', type=int, default=15,
+    parser.add_argument('--finetune_epochs', type=int, default=6,
                         help='the number of finetune epochs after pruning')
     parser.add_argument('--lr', type=float, default=0.001, help='the learning rate of model')
     parser.add_argument('--lr_decay', choices=['multistep', 'cos', 'step'], default='multistep', help='lr decay scheduler type')
@@ -224,7 +224,7 @@ if __name__ == '__main__':
         elif args.lr_decay == 'cos':
             scheduler = CosineAnnealingLR(optimizer, T_max=args.finetune_epochs)
         elif args.lr_decay == 'step':
-            scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+            scheduler = StepLR(optimizer, step_size=1, gamma=0.1)
         
         criterion = torch.nn.CrossEntropyLoss()
         if args.label_smothing:
@@ -248,3 +248,4 @@ if __name__ == '__main__':
         print('After finetuning:  %f' % (acc))
         
         flops, weights = count_flops_params(net, dummy_input.size())
+        print('Flops:', flops)
